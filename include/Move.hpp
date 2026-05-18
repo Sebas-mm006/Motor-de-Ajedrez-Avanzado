@@ -4,6 +4,14 @@
 #include "Piece.hpp"
 #include <iostream>
 
+enum class MoveType {
+    NORMAL,        // Movimiento normal
+    CAPTURE,       // Captura simple
+    EN_PASSANT,    // Captura al paso
+    CASTLING,      // Enroque
+    PROMOTION      // Promoción
+};
+
 /**
  * @brief Representa un movimiento en el tablero de ajedrez
  */
@@ -11,11 +19,14 @@ struct Move {
     int from_row, from_col;  // Posición de origen (fila, columna)
     int to_row, to_col;      // Posición de destino (fila, columna)
     Piece promoted_piece;    // Pieza a la que se promociona un peón (si aplica)
+    MoveType type;           // Tipo de movimiento
+    Piece captured_piece;    // Pieza capturada (si aplica)
 
     /**
      * @brief Constructor por defecto (crea movimiento nulo)
      */
-    Move() : from_row(-1), from_col(-1), to_row(-1), to_col(-1), promoted_piece() {}
+    Move() : from_row(-1), from_col(-1), to_row(-1), to_col(-1), 
+             promoted_piece(), type(MoveType::NORMAL), captured_piece() {}
 
     /**
      * @brief Constructor con parámetros
@@ -25,8 +36,9 @@ struct Move {
      * @param tc Columna de destino
      * @param promo Pieza de promoción (por defecto, pieza nula)
      */
-    Move(int fr, int fc, int tr, int tc, Piece promo = Piece()) 
-        : from_row(fr), from_col(fc), to_row(tr), to_col(tc), promoted_piece(promo) {}
+    Move(int fr, int fc, int tr, int tc, Piece promo = Piece(), MoveType mt = MoveType::NORMAL) 
+        : from_row(fr), from_col(fc), to_row(tr), to_col(tc), 
+          promoted_piece(promo), type(mt), captured_piece() {}
 
     /**
      * @brief Verifica si el movimiento es nulo
@@ -53,7 +65,7 @@ struct Move {
         char to_rank = '1' + m.to_row;
         os << from_file << from_rank << to_file << to_rank;
         if (!m.promoted_piece.isNull()) {
-            os << m.promoted_piece.toChar(); // letra de la pieza promovida
+            os << m.promoted_piece.toChar();
         }
         return os;
     }

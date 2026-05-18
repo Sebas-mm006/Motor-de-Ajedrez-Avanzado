@@ -9,6 +9,23 @@
 
 constexpr int BOARD_SIZE = 8;
 
+struct CastlingRights {
+    bool white_kingside = true;
+    bool white_queenside = true;
+    bool black_kingside = true;
+    bool black_queenside = true;
+    
+    bool any() const { return white_kingside || white_queenside || black_kingside || black_queenside; }
+};
+
+struct UndoInfo {
+    Piece captured_piece;
+    Piece moved_piece;
+    PieceType promoted_type;
+    CastlingRights castling_rights;
+    int en_passant_sq;
+};
+
 /**
  * @brief Representa el tablero de ajedrez y el estado del juego
  */
@@ -61,10 +78,18 @@ public:
     // Imprime el tablero en la consola (para depuración)
     void printBoard() const;
     
+    // Obtiene el square de en passant (fila * 8 + col, o -1 si no hay)
+    int getEnPassantSq() const { return en_passant_sq_; }
+    
+    // Obtiene los derechos de enroque
+    CastlingRights getCastlingRights() const { return castling_rights_; }
+    
 private:
     std::array<std::array<Piece, BOARD_SIZE>, BOARD_SIZE> board_;  // Matriz 8x8 de piezas
     PieceColor turn_;                                              // Indica cuyo turno es (BLANCO o NEGRO)
-    Piece lastCapture_;                                            // Pieza capturada en el último movimiento (para deshacer)
+    CastlingRights castling_rights_;                               // Derechos de enroque
+    int en_passant_sq_;                                            // Square de en passant (-1 si no hay)
+    mutable std::vector<UndoInfo> history_;                        // Historial para undo
     
     // Métodos privados auxiliares
     bool isSquareInside(int row, int col) const;                   // Verifica si una posición está dentro del tablero
@@ -91,6 +116,11 @@ private:
      * @return Pará (fila, columna) del rey, o (-1,-1) si no se encuentra
      */
     std::pair<int, int> findKing(PieceColor color) const;
+    
+    /**
+     * @brief Actualiza los derechos de enroque después de un movimiento
+     */
+    void updateCastlingRights(const Move& move, const Piece& piece);
 };
 
 #endif // BOARD_HPP

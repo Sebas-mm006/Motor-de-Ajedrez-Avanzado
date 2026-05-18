@@ -7,14 +7,11 @@ const int INF = 1000000;
 Search::Search() {}
 
 Move Search::searchBestMove(const Board& board, int depth) {
-    // We'll use negamax to search for the best move.
-    // The side to move is board.getTurn()
     PieceColor side = board.getTurn();
     std::vector<Move> moves = board.generateLegalMoves(side);
     if (moves.empty()) {
-        return Move(); // null move (no legal moves)
+        return Move();
     }
-    // Order moves to improve pruning
     moves = orderMoves(moves, board);
     Move bestMove;
     int bestValue = -INF;
@@ -23,8 +20,6 @@ Move Search::searchBestMove(const Board& board, int depth) {
     for (const Move& m : moves) {
         Board next = board;
         next.make_move(m);
-        // The value of the next position from the opponent's perspective is negamax(next, depth-1, -beta, -alpha)
-        // Then our value is the negative of that.
         int value = -negamax(next, depth-1, -beta, -alpha);
         if (value > bestValue) {
             bestValue = value;
@@ -34,31 +29,38 @@ Move Search::searchBestMove(const Board& board, int depth) {
             alpha = bestValue;
         }
         if (alpha >= beta) {
-            break; // beta cutoff
+            break;
         }
+    }
+    return bestMove;
+}
+
+Move Search::iterativeDeepening(const Board& board, int maxDepth) {
+    Move bestMove;
+    for (int depth = 1; depth <= maxDepth; ++depth) {
+        Move move = searchBestMove(board, depth);
+        if (move.isNull()) {
+            break;
+        }
+        bestMove = move;
     }
     return bestMove;
 }
 
 int Search::negamax(Board board, int depth, int alpha, int beta) {
     if (depth == 0) {
-        // Evaluate the position from the perspective of the side to move.
-        int eval = eval_.evaluate(board); // white-positive
+        int eval = eval_.evaluate(board);
         if (board.getTurn() == PieceColor::WHITE) {
             return eval;
         } else {
             return -eval;
         }
     }
-    // Check for game over
     PieceColor side = board.getTurn();
     if (board.is_mate(side)) {
-        // The side to move is checkmated -> lose
-        return -INF + depth; // slightly prefer sooner mates? Actually we return a large negative.
-        // We'll just return -INF for simplicity.
+        return -INF + depth;
     }
     if (!board.is_in_check(side) && board.generateLegalMoves(side).empty()) {
-        // Stalemate
         return 0;
     }
     std::vector<Move> moves = board.generateLegalMoves(side);
@@ -67,8 +69,6 @@ int Search::negamax(Board board, int depth, int alpha, int beta) {
     for (const Move& m : moves) {
         Board next = board;
         next.make_move(m);
-        // Recursion: the value of the position after the move from the opponent's perspective is negamax(next, depth-1, -beta, -alpha)
-        // Then our value is the negative of that.
         int nextValue = -negamax(next, depth-1, -beta, -alpha);
         if (nextValue > value) {
             value = nextValue;
@@ -77,29 +77,50 @@ int Search::negamax(Board board, int depth, int alpha, int beta) {
             alpha = value;
         }
         if (alpha >= beta) {
-            break; // beta cutoff
+            break;
         }
     }
     return value;
 }
 
 std::vector<Move> Search::orderMoves(const std::vector<Move>& moves, const Board& board) const {
-    // Simple ordering: captures first, then others.
-    // We'll separate captures and non-captures.
-    std::vector<Move> captures;
-    std::vector<Move> nonCaptures;
+    std::vector<std::pair<int, Move>> scored;
+    scored.reserve(moves.size());
+    
     for (const Move& m : moves) {
-        Piece captured = board.getPiece(m.to_row, m.to_col);
-        if (!captured.isNull()) {
-            captures.push_back(m);
-        } else {
-            nonCaptures.push_back(m);
+        int score = 0;
+        Piece target = board.getPiece(m.to_row, m.to_col);
+        
+        if (m.type == MoveType::CASTLING) {
+            score = 1000;
+        } else if (m.type == MoveType::EN_PASSANT) {
+            score = 400;
+        } else if (!target.isNull()) {
+            int victimValue = 0;
+            switch (target.getType()) {
+                case PieceType::PAWN: victimValue = 100; break;
+                case PieceType::KNIGHT: victimValue = 320; break;
+                case PieceType::BISHOP: victimValue = 330; break;
+                case PieceType::ROOK: victimValue = 500; break;
+                case PieceType::QUEEN: victimValue = 900; break;
+                default: victimValue = 0; break;
+            }
+            score = 1000 + victimValue;
+        } else if (m.type == MoveType::PROMOTION) {
+            score = 900;
         }
+        scored.emplace_back(score, m);
     }
-    // Combine: captures first
+    
+    std::sort(scored.begin(), scored.end(), 
+              [](const std::pair<int, Move>& a, const std::pair<int, Move>& b) {
+                  return a.first > b.first;
+              });
+    
     std::vector<Move> ordered;
     ordered.reserve(moves.size());
-    ordered.insert(ordered.end(), captures.begin(), captures.end());
-    ordered.insert(ordered.end(), nonCaptures.begin(), nonCaptures.end());
+    for (const auto& p : scored) {
+        ordered.push_back(p.second);
+    }
     return ordered;
 }

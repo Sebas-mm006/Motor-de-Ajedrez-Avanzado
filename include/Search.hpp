@@ -22,6 +22,14 @@ public:
      */
     Move searchBestMove(const Board& board, int depth);
     
+    /**
+     * @brief Búsqueda iterativa con profundidad progresiva
+     * @param board Posición actual del tablero
+     * @param maxDepth Profundidad máxima de búsqueda
+     * @return Mejor movimiento encontrado
+     */
+    Move iterativeDeepening(const Board& board, int maxDepth);
+    
 private:
     /**
      * @brief Algoritmo Negamax con poda alfa-beta

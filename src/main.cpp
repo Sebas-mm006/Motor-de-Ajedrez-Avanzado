@@ -20,11 +20,10 @@ void runDemoMode() {
     cout << "Turn: " << (board.getTurn() == PieceColor::WHITE ? "White" : "Black") << endl;
 
     Search search;
-    int depth = 2;
-    Move best = search.searchBestMove(board, depth);
+    int depth = 3;
+    Move best = search.iterativeDeepening(board, depth);
     cout << "Best move at depth " << depth << ": " << best << endl;
 
-    // Make the move
     board.make_move(best);
     cout << "After move:" << endl;
     board.printBoard();
@@ -51,15 +50,13 @@ void runBackendMode() {
     
     string line;
     while (getline(cin, line)) {
-        // Parse simple JSON-like commands (for simplicity, we'll use a basic parser)
-        // In a real application, use a proper JSON library
-        
-        if (line.find("{\"cmd\": \"init\"}") != string::npos) {
+        if (line.empty()) continue;
+        if (line.find("\"cmd\": \"init\"") != string::npos) {
             board.initStartPosition();
             cout << "{\"status\": \"ok\"}" << endl;
             cout.flush();
         }
-        else if (line.find("{\"cmd\": \"board\"}") != string::npos) {
+        else if (line.find("\"cmd\": \"board\"") != string::npos) {
             // Convert board to a simple string representation
             stringstream ss;
             ss << "{\"status\": \"ok\", \"board\": [";
@@ -91,23 +88,20 @@ void runBackendMode() {
             cout << ss.str();
             cout.flush();
         }
-        else if (line.find("{\"cmd\": \"move\"}") != string::npos) {
-            // Extract move string like "e2e4"
+        else if (line.find("\"cmd\": \"move\"") != string::npos) {
             size_t moveStart = line.find("\"move\": \"");
             if (moveStart != string::npos) {
-                moveStart += 9; // length of "\"move\": \""
+                moveStart += 9;
                 size_t moveEnd = line.find("\"", moveStart);
                 if (moveEnd != string::npos) {
                     string moveStr = line.substr(moveStart, moveEnd - moveStart);
                     if (moveStr.length() == 4) {
                         int from_col = moveStr[0] - 'a';
-                        int from_row = '8' - moveStr[1]; // note: '8' is ASCII 56, so '8' - '1' = 7, etc.
+                        int from_row = '8' - moveStr[1];
                         int to_col = moveStr[2] - 'a';
                         int to_row = '8' - moveStr[3];
                         
                         Move move(from_row, from_col, to_row, to_col);
-                        // In a real implementation, we would validate the move
-                        // For now, we'll just make it (assuming it's legal)
                         board.make_move(move);
                         cout << "{\"status\": \"ok\"}" << endl;
                         cout.flush();
@@ -118,7 +112,7 @@ void runBackendMode() {
             cout << "{\"status\": \"error\", \"message\": \"Invalid move format\"}" << endl;
             cout.flush();
         }
-        else if (line.find("{\"cmd\": \"getmove\"}") != string::npos) {
+        else if (line.find("\"cmd\": \"getmove\"") != string::npos) {
             // Extract depth
             size_t depthStart = line.find("\"depth\": ");
             int depth = 2; // default
@@ -162,7 +156,7 @@ void runBackendMode() {
             cout << "{\"status\": \"ok\", \"move\": \"" << moveStr << "\"}" << endl;
             cout.flush();
         }
-        else if (line.find("{\"cmd\": \"quit\"}") != string::npos) {
+        else if (line.find("\"cmd\": \"quit\"") != string::npos) {
             cout << "{\"status\": \"ok\"}" << endl;
             cout.flush();
             break;
