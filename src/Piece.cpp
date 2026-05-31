@@ -46,21 +46,15 @@ void Piece::setColor(PieceColor color) {
 }
 
 /**
- * @brief Verifica si la pieza es nula (no representa una pieza real)
- * @return true si es nula, false en caso contrario
- */
-bool Piece::isNull() const {
-    return type_ == PieceType::NONE && color_ == PieceColor::NONE;
-}
-
-/**
- * @brief Convierte la pieza a su representación ASCII
+ * @brief Obtiene la representación ASCII de una pieza dado su tipo y color
+ * @param type Tipo de pieza
+ * @param color Color de la pieza
  * @return Carácter que representa la pieza (mayúscula para blanco, minúscula para negro)
  */
-char Piece::toChar() const {
-    if (isNull()) return ' ';
+char Piece::pieceToChar(PieceType type, PieceColor color) {
+    if (type == PieceType::NONE) return ' ';
     char pieceChar = '?';
-    switch (type_) {
+    switch (type) {
         case PieceType::PAWN: pieceChar = 'P'; break;
         case PieceType::KNIGHT: pieceChar = 'N'; break;
         case PieceType::BISHOP: pieceChar = 'B'; break;
@@ -69,7 +63,7 @@ char Piece::toChar() const {
         case PieceType::KING: pieceChar = 'K'; break;
         default: pieceChar = '?';
     }
-    if (color_ == PieceColor::BLACK) {
+    if (color == PieceColor::BLACK) {
         pieceChar = std::tolower(static_cast<unsigned char>(pieceChar));
     }
     return pieceChar;

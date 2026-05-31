@@ -1,17 +1,27 @@
 #include "./../include/Eval.hpp"
 
+/**
+ * @brief Constructor por defecto de la clase Eval
+ */
 Eval::Eval() {}
 
+/**
+ * @brief Evalúa el valor total de una posición de tablero
+ * Combina valor material y bonificaciones posicionales
+ * @param board Tablero a evaluar
+ * @return Puntuación en centipawns
+ */
 int Eval::evaluate(const Board& board) const {
     int score = 0;
-    // Iterate over all squares
+    // Iterar sobre todas las casillas del tablero
     for (int row = 0; row < BOARD_SIZE; ++row) {
         for (int col = 0; col < BOARD_SIZE; ++col) {
-            Piece p = board.getPiece(row, col);
+            const Piece& p = board.getPiece(row, col);
             if (p.isNull()) continue;
             int value = pieceValue(p.getType());
             int bonus = pieceSquareBonus(p.getType(), p.getColor(), row, col);
             int total = value + bonus;
+            // Sumar para blancas, restar para negras
             if (p.getColor() == PieceColor::WHITE) {
                 score += total;
             } else {
@@ -22,6 +32,11 @@ int Eval::evaluate(const Board& board) const {
     return score;
 }
 
+/**
+ * @brief Obtiene el valor material base de una pieza
+ * @param type Tipo de pieza
+ * @return Valor en centipawns
+ */
 int Eval::pieceValue(PieceType type) const {
     switch (type) {
         case PieceType::PAWN: return pawnValue;
@@ -34,8 +49,17 @@ int Eval::pieceValue(PieceType type) const {
     }
 }
 
+/**
+ * @brief Obtiene el bonus posicional según la tabla pieza-casilla
+ * @param type Tipo de pieza
+ * @param color Color de la pieza
+ * @param row Fila (0-7)
+ * @param col Columna (0-7)
+ * @return Bonus posicional en centipawns
+ */
 int Eval::pieceSquareBonus(PieceType type, PieceColor color, int row, int col) const {
-    // For simplicity, we'll use the same table for both colors but flip the row for black.
+    // Para simplicidad, usamos la misma tabla para ambos colores
+    // pero invertimos la fila para las piezas negras
     int r = (color == PieceColor::WHITE) ? row : (BOARD_SIZE - 1 - row);
     int c = col;
     switch (type) {

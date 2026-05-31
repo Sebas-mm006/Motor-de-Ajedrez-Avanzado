@@ -18,15 +18,16 @@ enum class MoveType {
 struct Move {
     int from_row, from_col;  // Posición de origen (fila, columna)
     int to_row, to_col;      // Posición de destino (fila, columna)
-    Piece promoted_piece;    // Pieza a la que se promociona un peón (si aplica)
+    PieceType promoted_piece_type;    // Tipo de pieza a la que se promociona un peón (si aplica)
+    PieceColor promoted_piece_color;  // Color de la pieza a la que se promociona un peón (si aplica)
     MoveType type;           // Tipo de movimiento
-    Piece captured_piece;    // Pieza capturada (si aplica)
+    PieceType captured_piece_type;    // Tipo de pieza capturada (si aplica)
+    PieceColor captured_piece_color;  // Color de la pieza capturada (si aplica)
 
     /**
      * @brief Constructor por defecto (crea movimiento nulo)
      */
-    Move() : from_row(-1), from_col(-1), to_row(-1), to_col(-1), 
-             promoted_piece(), type(MoveType::NORMAL), captured_piece() {}
+    Move();
 
     /**
      * @brief Constructor con parámetros
@@ -34,19 +35,20 @@ struct Move {
      * @param fc Columna de origen
      * @param tr Fila de destino
      * @param tc Columna de destino
-     * @param promo Pieza de promoción (por defecto, pieza nula)
+     * @param promo_type Tipo de pieza de promoción (por defecto, pieza nula)
+     * @param promo_color Color de pieza de promoción (por defecto, pieza nula)
+     * @param mt Tipo de movimiento (por defecto, NORMAL)
      */
-    Move(int fr, int fc, int tr, int tc, Piece promo = Piece(), MoveType mt = MoveType::NORMAL) 
-        : from_row(fr), from_col(fc), to_row(tr), to_col(tc), 
-          promoted_piece(promo), type(mt), captured_piece() {}
+    Move(int fr, int fc, int tr, int tc, 
+         PieceType promo_type = PieceType::NONE, 
+         PieceColor promo_color = PieceColor::NONE, 
+         MoveType mt = MoveType::NORMAL);
 
     /**
      * @brief Verifica si el movimiento es nulo
      * @return true si es nulo, false en caso contrario
      */
-    bool isNull() const {
-        return from_row == -1 && from_col == -1 && to_row == -1 && to_col == -1;
-    }
+    bool isNull() const;
 
     /**
      * @brief Sobrecarga del operador de salida para imprimir el movimiento
@@ -54,21 +56,7 @@ struct Move {
      * @param m Movimiento a imprimir
      * @return Referencia al flujo de salida
      */
-    friend std::ostream& operator<<(std::ostream& os, const Move& m) {
-        if (m.isNull()) {
-            os << "movimiento nulo";
-            return os;
-        }
-        char from_file = 'a' + m.from_col;
-        char from_rank = '1' + m.from_row;
-        char to_file = 'a' + m.to_col;
-        char to_rank = '1' + m.to_row;
-        os << from_file << from_rank << to_file << to_rank;
-        if (!m.promoted_piece.isNull()) {
-            os << m.promoted_piece.toChar();
-        }
-        return os;
-    }
+    friend std::ostream& operator<<(std::ostream& os, const Move& m);
 };
 
 #endif // MOVE_HPP

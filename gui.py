@@ -1,111 +1,98 @@
 import pygame
 import subprocess
 import json
+import os
 
-# Constants
-WIDTH, HEIGHT = 640, 640
-ROWS, COLS = 8, 8
-SQUARE_SIZE = WIDTH // COLS
+# Constantes
+ANCHO, ALTO = 640, 640
+FILAS, COLUMNAS = 8, 8
+TAMANO_CASILLA = ANCHO // COLUMNAS
 
-# Colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-LIGHT_BROWN = (240, 217, 181)
-DARK_BROWN = (181, 136, 99)
-HIGHLIGHT = (186, 202, 68)
-RED = (255, 0, 0)
+# Colores
+BLANCO = (255, 255, 255)
+NEGRO = (0, 0, 0)
+MARRON_CLARO = (240, 217, 181)
+MARRON_OSCURO = (181, 136, 99)
+RESALTE = (186, 202, 68)
+ROJO = (255, 0, 0)
 
-# Piece Unicode symbols
-PIECE_SYMBOLS = {
+# Simbolos Unicode de las piezas (usar ingles para coincidir con el backend)
+SIMBOLOS_PIEZAS = {
     'white': {'pawn': '♙', 'knight': '♘', 'bishop': '♗', 'rook': '♖', 'queen': '♕', 'king': '♔'},
     'black': {'pawn': '♟', 'knight': '♞', 'bishop': '♝', 'rook': '♜', 'queen': '♛', 'king': '♚'}
 }
 
-# Optional: Try to load piece images if available
-def load_piece_images():
-    """Attempt to load piece images from a pieces directory"""
-    try:
-        import os
-        pieces_dir = os.path.join(os.path.dirname(__file__), 'pieces')
-        if os.path.exists(pieces_dir):
-            piece_mapping = {
-                ('white', 'pawn'): 'wp.png',
-                ('white', 'rook'): 'wr.png',
-                ('white', 'knight'): 'wn.png',
-                ('white', 'bishop'): 'wb.png',
-                ('white', 'queen'): 'wq.png',
-                ('white', 'king'): 'wk.png',
-                ('black', 'pawn'): 'bp.png',
-                ('black', 'rook'): 'br.png',
-                ('black', 'knight'): 'bn.png',
-                ('black', 'bishop'): 'bb.png',
-                ('black', 'queen'): 'bq.png',
-                ('black', 'king'): 'bk.png'
-            }
-            
-            images = {}
-            for (color, piece_type), filename in piece_mapping.items():
-                image_path = os.path.join(pieces_dir, filename)
-                if os.path.exists(image_path):
-                    try:
-                        image = pygame.image.load(image_path)
-                        # Scale image to fit square size with some padding
-                        image = pygame.transform.smoothscale(image, (SQUARE_SIZE - 20, SQUARE_SIZE - 20))
-                        images[(color, piece_type)] = image
-                    except pygame.error:
-                        pass  # Failed to load this image, continue with others
-            return images
-    except ImportError:
-        pass
-    return {}
+# Cargar imagenes de piezas desde la carpeta img
+def cargar_imagenes_piezas():
+    ruta_img = os.path.join(os.path.dirname(__file__), 'img')
+    if not os.path.exists(ruta_img):
+        return {}
+    mapeo = {
+        ('white', 'pawn'): 'wp.png',
+        ('white', 'rook'): 'wR.png',
+        ('white', 'knight'): 'wN.png',
+        ('white', 'bishop'): 'wB.png',
+        ('white', 'queen'): 'wQ.png',
+        ('white', 'king'): 'wK.png',
+        ('black', 'pawn'): 'bp.png',
+        ('black', 'rook'): 'bR.png',
+        ('black', 'knight'): 'bN.png',
+        ('black', 'bishop'): 'bB.png',
+        ('black', 'queen'): 'bQ.png',
+        ('black', 'king'): 'bK.png'
+    }
+    imagenes = {}
+    for (color, tipo_pieza), nombre_archivo in mapeo.items():
+        ruta = os.path.join(ruta_img, nombre_archivo)
+        if os.path.exists(ruta):
+            try:
+                imagen = pygame.image.load(ruta)
+                imagen = pygame.transform.smoothscale(imagen, (TAMANO_CASILLA - 20, TAMANO_CASILLA - 20))
+                imagenes[(color, tipo_pieza)] = imagen
+            except pygame.error:
+                pass
+    return imagenes
 
-# Load piece images at module level
-PIECE_IMAGES = load_piece_images()
-
-class ChessGUI:
+class MotorAjedrezGUI:
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("Chess Engine")
-        # Try to get a font that supports Unicode chess symbols
-        font_names = ['dejavusans', 'dejavu sans', 'freesserif', 'free serif', 
-                     'arial unicode ms', 'symbola', 'noto sans', 
-                     'sans-serif']  # Generic fallback
-        self.font = None
-        self.small_font = None
-        
-        for font_name in font_names:
+        self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
+        pygame.display.set_caption("Motor de Ajedrez")
+        self.imagenes_piezas = cargar_imagenes_piezas()
+        self.fuente = None
+        self.fuente_pequena = None
+
+        nombres_fuentes = ['dejavusans', 'dejavu sans', 'freesserif', 'free serif',
+                           'arial unicode ms', 'symbola', 'noto sans',
+                           'sans-serif']
+        for nombre in nombres_fuentes:
             try:
-                self.font = pygame.font.SysFont(font_name, 48)
-                self.small_font = pygame.font.SysFont(font_name, 20)
-                # Test if font can render a chess symbol
-                test_surf = self.font.render('♙', True, WHITE)
-                if test_surf.get_width() > 0:  # Font works
+                self.fuente = pygame.font.SysFont(nombre, 48)
+                self.fuente_pequena = pygame.font.SysFont(nombre, 20)
+                prueba = self.fuente.render('♙', True, BLANCO)
+                if prueba.get_width() > 0:
                     break
             except:
                 continue
-        
-        # Fallback to default font if none worked
-        if self.font is None:
-            self.font = pygame.font.SysFont(None, 48)
-            self.small_font = pygame.font.SysFont(None, 20)
-        
-        self.board = [[None for _ in range(COLS)] for _ in range(ROWS)]
-        self.selected_square = None
-        self.highlighted_squares = []
-        self.current_turn = 'white'
-        self.game_over = False
-        self.status_text = ""
-         
-        self.engine = None
-        self.start_engine()
-        self.init_board()
-        # Load piece images after engine is started
-        load_piece_images()
-    
-    def start_engine(self):
+
+        if self.fuente is None:
+            self.fuente = pygame.font.SysFont(None, 48)
+            self.fuente_pequena = pygame.font.SysFont(None, 20)
+
+        self.tablero = [[None for _ in range(COLUMNAS)] for _ in range(FILAS)]
+        self.casilla_seleccionada = None
+        self.casillas_resaltadas = []
+        self.turno_actual = 'white'
+        self.juego_terminado = False
+        self.texto_estado = ""
+
+        self.motor = None
+        self.iniciar_motor()
+        self.inicializar_tablero()
+
+    def iniciar_motor(self):
         try:
-            self.engine = subprocess.Popen(
+            self.motor = subprocess.Popen(
                 ['./bin/chess', 'backend'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -113,269 +100,268 @@ class ChessGUI:
                 text=True,
                 bufsize=1
             )
-            self.send_command({"cmd": "init"})
+            self.enviar_comando({"cmd": "init"})
         except Exception as e:
-            self.status_text = f"Error starting engine: {e}"
-            self.game_over = True
-    
-    def send_command(self, cmd_dict):
-        if self.engine:
+            self.texto_estado = f"Error al iniciar el motor: {e}"
+            self.juego_terminado = True
+
+    def enviar_comando(self, comando_dict):
+        if self.motor:
             try:
-                cmd = json.dumps(cmd_dict) + '\n'
-                self.engine.stdin.write(cmd)
-                self.engine.stdin.flush()
-                response = self.engine.stdout.readline().strip()
-                return json.loads(response) if response else {}
+                comando = json.dumps(comando_dict) + '\n'
+                self.motor.stdin.write(comando)
+                self.motor.stdin.flush()
+                respuesta = self.motor.stdout.readline().strip()
+                return json.loads(respuesta) if respuesta else {}
             except (BrokenPipeError, OSError):
                 return {}
         return {}
-    
-    def init_board(self):
-        response = self.send_command({"cmd": "board"})
-        if 'board' in response:
-            for item in response['board']:
-                if item is not None:
-                    row, col = item['row'], item['col']
-                    self.board[row][col] = {
-                        'type': item['type'],
-                        'color': item['color']
+
+    def inicializar_tablero(self):
+        respuesta = self.enviar_comando({"cmd": "board"})
+        if 'board' in respuesta:
+            for elemento in respuesta['board']:
+                if elemento is not None:
+                    fila, col = elemento['row'], elemento['col']
+                    self.tablero[fila][col] = {
+                        'type': elemento['type'],
+                        'color': elemento['color']
                     }
-            self.current_turn = response.get('turn', 'white')
-    
-    def update_board_state(self):
-        response = self.send_command({"cmd": "board"})
-        if 'board' in response:
-            self.board = [[None for _ in range(COLS)] for _ in range(ROWS)]
-            for item in response['board']:
-                if item is not None:
-                    row, col = item['row'], item['col']
-                    self.board[row][col] = {
-                        'type': item['type'],
-                        'color': item['color']
+            self.turno_actual = respuesta.get('turn', 'white')
+
+    def actualizar_estado_tablero(self):
+        respuesta = self.enviar_comando({"cmd": "board"})
+        if 'board' in respuesta:
+            self.tablero = [[None for _ in range(COLUMNAS)] for _ in range(FILAS)]
+            for elemento in respuesta['board']:
+                if elemento is not None:
+                    fila, col = elemento['row'], elemento['col']
+                    self.tablero[fila][col] = {
+                        'type': elemento['type'],
+                        'color': elemento['color']
                     }
-            self.current_turn = response.get('turn', 'white')
-    
-    def draw_board(self):
-        self.screen.fill(WHITE)
-        for row in range(ROWS):
-            for col in range(COLS):
-                color = LIGHT_BROWN if (row + col) % 2 == 0 else DARK_BROWN
-                rect = pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
-                pygame.draw.rect(self.screen, color, rect)
-                
-                if (row, col) in self.highlighted_squares:
-                    s = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE))
+            self.turno_actual = respuesta.get('turn', 'white')
+
+    def dibujar_tablero(self):
+        self.pantalla.fill(BLANCO)
+        for fila in range(FILAS):
+            for col in range(COLUMNAS):
+                color = MARRON_CLARO if (fila + col) % 2 == 0 else MARRON_OSCURO
+                rect = pygame.Rect(col * TAMANO_CASILLA, fila * TAMANO_CASILLA, TAMANO_CASILLA, TAMANO_CASILLA)
+                pygame.draw.rect(self.pantalla, color, rect)
+
+                if (fila, col) in self.casillas_resaltadas:
+                    s = pygame.Surface((TAMANO_CASILLA, TAMANO_CASILLA))
                     s.set_alpha(128)
-                    s.fill(HIGHLIGHT)
-                    self.screen.blit(s, rect.topleft)
-                
-                piece = self.board[row][col]
-                if piece:
-                    symbol = PIECE_SYMBOLS[piece['color']][piece['type']]
-                    # Convert color string to RGB tuple
-                    color_rgb = WHITE if piece['color'] == 'white' else BLACK
-                    # Render with anti-aliasing for better appearance
-                    text = self.font.render(symbol, True, color_rgb)
-                    # Create a background rectangle for better contrast if needed
-                    text_rect = text.get_rect(center=(col * SQUARE_SIZE + SQUARE_SIZE // 2, 
-                                                      row * SQUARE_SIZE + SQUARE_SIZE // 2))
-                    self.screen.blit(text, text_rect)
-        
+                    s.fill(RESALTE)
+                    self.pantalla.blit(s, rect.topleft)
+
+                pieza = self.tablero[fila][col]
+                if pieza:
+                    clave = (pieza['color'], pieza['type'])
+                    if clave in self.imagenes_piezas:
+                        imagen = self.imagenes_piezas[clave]
+                        rect_imagen = imagen.get_rect(center=(col * TAMANO_CASILLA + TAMANO_CASILLA // 2,
+                                                               fila * TAMANO_CASILLA + TAMANO_CASILLA // 2))
+                        self.pantalla.blit(imagen, rect_imagen)
+                    else:
+                        simbolo = SIMBOLOS_PIEZAS[pieza['color']][pieza['type']]
+                        color_rgb = BLANCO if pieza['color'] == 'white' else NEGRO
+                        texto = self.fuente.render(simbolo, True, color_rgb)
+                        rect_texto = texto.get_rect(center=(col * TAMANO_CASILLA + TAMANO_CASILLA // 2,
+                                                            fila * TAMANO_CASILLA + TAMANO_CASILLA // 2))
+                        self.pantalla.blit(texto, rect_texto)
+
         pygame.display.flip()
-    
-    def get_board_pos(self, pos):
-        col = pos[0] // SQUARE_SIZE
-        row = pos[1] // SQUARE_SIZE
-        return row, col
-    
-    def row_col_to_algebraic(self, row, col):
-        return f"{chr(ord('a') + col)}{8 - row}"
-    
-    def handle_click(self, pos):
-        if self.game_over:
+
+    def obtener_posicion_tablero(self, pos):
+        col = pos[0] // TAMANO_CASILLA
+        fila = pos[1] // TAMANO_CASILLA
+        return fila, col
+
+    def fila_col_a_algebraica(self, fila, col):
+        return f"{chr(ord('a') + col)}{8 - fila}"
+
+    def manejar_clic(self, pos):
+        if self.juego_terminado:
             return
-            
-        row, col = self.get_board_pos(pos)
-        
-        if self.selected_square is None:
-            piece = self.board[row][col]
-            if piece and piece['color'] == self.current_turn:
-                self.selected_square = (row, col)
-                self.highlighted_squares = [(row, col)]
-                self.highlight_valid_moves(row, col)
+
+        fila, col = self.obtener_posicion_tablero(pos)
+
+        if self.casilla_seleccionada is None:
+            pieza = self.tablero[fila][col]
+            if pieza and pieza['color'] == self.turno_actual:
+                self.casilla_seleccionada = (fila, col)
+                self.casillas_resaltadas = [(fila, col)]
+                self.resaltar_movimientos_validos(fila, col)
         else:
-            from_sq = self.selected_square
-            to_sq = (row, col)
-            
-            move_str = self.row_col_to_algebraic(from_sq[0], from_sq[1]) + \
-                      self.row_col_to_algebraic(to_sq[0], to_sq[1])
-            
-            response = self.send_command({"cmd": "move", "move": move_str})
-            
-            if response.get('status') == 'ok':
-                self.update_board_state()
-                
-                if not self.game_over:
-                    self.ai_move()
+            desde = self.casilla_seleccionada
+            hasta = (fila, col)
+
+            cadena_mov = self.fila_col_a_algebraica(desde[0], desde[1]) + \
+                         self.fila_col_a_algebraica(hasta[0], hasta[1])
+
+            respuesta = self.enviar_comando({"cmd": "move", "move": cadena_mov})
+
+            if respuesta.get('status') == 'ok':
+                self.actualizar_estado_tablero()
+
+                if not self.juego_terminado:
+                    self.movimiento_ia()
             else:
-                self.status_text = "Invalid move"
-            
-            self.selected_square = None
-            self.highlighted_squares = []
-    
-    def highlight_valid_moves(self, row, col):
-        piece = self.board[row][col]
-        if not piece:
+                self.texto_estado = "Movimiento invalido"
+
+            self.casilla_seleccionada = None
+            self.casillas_resaltadas = []
+
+    def resaltar_movimientos_validos(self, fila, col):
+        pieza = self.tablero[fila][col]
+        if not pieza:
             return
-        
-        color = piece['color']
-        ptype = piece['type']
-        
-        # Helper functions
-        def is_empty(r, c):
-            return self.board[r][c] is None
-        
-        def is_opponent(r, c):
-            target = self.board[r][c]
-            return target is not None and target['color'] != color
-        
-        moves = []
-        
-        if ptype == 'pawn':
-            direction = -1 if color == 'white' else 1  # white moves up (row-1), black moves down (row+1)
-            start_row = 6 if color == 'white' else 1
-            # One step forward
-            new_row = row + direction
-            if 0 <= new_row < 8 and is_empty(new_row, col):
-                moves.append((new_row, col))
-                # Two steps from start
-                if row == start_row:
-                    new_row2 = row + 2 * direction
-                    if is_empty(new_row2, col):
-                        moves.append((new_row2, col))
-            # Captures
+
+        color = pieza['color']
+        tipo = pieza['type']
+
+        def esta_vacia(f, c):
+            return self.tablero[f][c] is None
+
+        def es_oponente(f, c):
+            objetivo = self.tablero[f][c]
+            return objetivo is not None and objetivo['color'] != color
+
+        movimientos = []
+
+        if tipo == 'pawn':
+            direccion = -1 if color == 'white' else 1
+            fila_inicio = 6 if color == 'white' else 1
+            nueva_fila = fila + direccion
+            if 0 <= nueva_fila < 8 and esta_vacia(nueva_fila, col):
+                movimientos.append((nueva_fila, col))
+                if fila == fila_inicio:
+                    nueva_fila2 = fila + 2 * direccion
+                    if esta_vacia(nueva_fila2, col):
+                        movimientos.append((nueva_fila2, col))
             for dc in (-1, 1):
-                new_row = row + direction
-                new_col = col + dc
-                if 0 <= new_row < 8 and 0 <= new_col < 8:
-                    if is_opponent(new_row, new_col):
-                        moves.append((new_row, new_col))
-        
-        elif ptype == 'knight':
-            knight_moves = [(2, 1), (2, -1), (-2, 1), (-2, -1),
-                            (1, 2), (1, -2), (-1, 2), (-1, -2)]
-            for dr, dc in knight_moves:
-                new_row, new_col = row + dr, col + dc
-                if 0 <= new_row < 8 and 0 <= new_col < 8:
-                    if is_empty(new_row, new_col) or is_opponent(new_row, new_col):
-                        moves.append((new_row, new_col))
-        
-        elif ptype == 'bishop':
-            directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
-            for dr, dc in directions:
-                new_row, new_col = row + dr, col + dc
-                while 0 <= new_row < 8 and 0 <= new_col < 8:
-                    if is_empty(new_row, new_col):
-                        moves.append((new_row, new_col))
-                    elif is_opponent(new_row, new_col):
-                        moves.append((new_row, new_col))
-                        break
-                    else:
-                        break  # own piece blocks
-                    new_row += dr
-                    new_col += dc
-        
-        elif ptype == 'rook':
-            directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-            for dr, dc in directions:
-                new_row, new_col = row + dr, col + dc
-                while 0 <= new_row < 8 and 0 <= new_col < 8:
-                    if is_empty(new_row, new_col):
-                        moves.append((new_row, new_col))
-                    elif is_opponent(new_row, new_col):
-                        moves.append((new_row, new_col))
+                nueva_fila = fila + direccion
+                nueva_col = col + dc
+                if 0 <= nueva_fila < 8 and 0 <= nueva_col < 8:
+                    if es_oponente(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
+
+        elif tipo == 'knight':
+            movimientos_caballo = [(2, 1), (2, -1), (-2, 1), (-2, -1),
+                                   (1, 2), (1, -2), (-1, 2), (-1, -2)]
+            for dr, dc in movimientos_caballo:
+                nueva_fila, nueva_col = fila + dr, col + dc
+                if 0 <= nueva_fila < 8 and 0 <= nueva_col < 8:
+                    if esta_vacia(nueva_fila, nueva_col) or es_oponente(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
+
+        elif tipo == 'bishop':
+            direcciones = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+            for dr, dc in direcciones:
+                nueva_fila, nueva_col = fila + dr, col + dc
+                while 0 <= nueva_fila < 8 and 0 <= nueva_col < 8:
+                    if esta_vacia(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
+                    elif es_oponente(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
                         break
                     else:
                         break
-                    new_row += dr
-                    new_col += dc
-        
-        elif ptype == 'queen':
-            directions = [(-1, -1), (-1, 0), (-1, 1),
-                          (0, -1),           (0, 1),
-                          (1, -1),  (1, 0),  (1, 1)]
-            for dr, dc in directions:
-                new_row, new_col = row + dr, col + dc
-                while 0 <= new_row < 8 and 0 <= new_col < 8:
-                    if is_empty(new_row, new_col):
-                        moves.append((new_row, new_col))
-                    elif is_opponent(new_row, new_col):
-                        moves.append((new_row, new_col))
+                    nueva_fila += dr
+                    nueva_col += dc
+
+        elif tipo == 'rook':
+            direcciones = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+            for dr, dc in direcciones:
+                nueva_fila, nueva_col = fila + dr, col + dc
+                while 0 <= nueva_fila < 8 and 0 <= nueva_col < 8:
+                    if esta_vacia(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
+                    elif es_oponente(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
                         break
                     else:
                         break
-                    new_row += dr
-                    new_col += dc
-        
-        elif ptype == 'king':
-            king_moves = [(-1, -1), (-1, 0), (-1, 1),
-                          (0, -1),           (0, 1),
-                          (1, -1),  (1, 0),  (1, 1)]
-            for dr, dc in king_moves:
-                new_row, new_col = row + dr, col + dc
-                if 0 <= new_row < 8 and 0 <= new_col < 8:
-                    if is_empty(new_row, new_col) or is_opponent(new_row, new_col):
-                        moves.append((new_row, new_col))
-        
-        # Set highlighted squares: selected square plus valid moves
-        self.highlighted_squares = [(row, col)] + moves
-    
-    def ai_move(self):
+                    nueva_fila += dr
+                    nueva_col += dc
+
+        elif tipo == 'queen':
+            direcciones = [(-1, -1), (-1, 0), (-1, 1),
+                           (0, -1),           (0, 1),
+                           (1, -1),  (1, 0),  (1, 1)]
+            for dr, dc in direcciones:
+                nueva_fila, nueva_col = fila + dr, col + dc
+                while 0 <= nueva_fila < 8 and 0 <= nueva_col < 8:
+                    if esta_vacia(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
+                    elif es_oponente(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
+                        break
+                    else:
+                        break
+                    nueva_fila += dr
+                    nueva_col += dc
+
+        elif tipo == 'king':
+            movimientos_rey = [(-1, -1), (-1, 0), (-1, 1),
+                               (0, -1),           (0, 1),
+                               (1, -1),  (1, 0),  (1, 1)]
+            for dr, dc in movimientos_rey:
+                nueva_fila, nueva_col = fila + dr, col + dc
+                if 0 <= nueva_fila < 8 and 0 <= nueva_col < 8:
+                    if esta_vacia(nueva_fila, nueva_col) or es_oponente(nueva_fila, nueva_col):
+                        movimientos.append((nueva_fila, nueva_col))
+
+        self.casillas_resaltadas = [(fila, col)] + movimientos
+
+    def movimiento_ia(self):
         import time
-        self.status_text = "AI thinking..."
-        self.draw_board()
-        
-        response = self.send_command({"cmd": "getmove", "depth": 3})
-        
-        if response.get('status') == 'ok' and response.get('move'):
-            move = response['move']
+        self.texto_estado = "IA pensando..."
+        self.dibujar_tablero()
+
+        respuesta = self.enviar_comando({"cmd": "getmove", "depth": 3})
+
+        if respuesta.get('status') == 'ok' and respuesta.get('move'):
+            movimiento = respuesta['move']
             time.sleep(0.1)
-            self.update_board_state()
-            self.status_text = ""
+            self.actualizar_estado_tablero()
+            self.texto_estado = ""
         else:
-            self.status_text = "Game over or no moves"
-            self.game_over = True
-    
-    def draw_status(self):
-        if self.status_text:
-            text = self.small_font.render(self.status_text, True, RED)
-            self.screen.blit(text, (10, HEIGHT - 30))
+            self.texto_estado = "Juego terminado o sin movimientos"
+            self.juego_terminado = True
+
+    def dibujar_estado(self):
+        if self.texto_estado:
+            texto = self.fuente_pequena.render(self.texto_estado, True, ROJO)
+            self.pantalla.blit(texto, (10, ALTO - 30))
             pygame.display.flip()
-    
-    def run(self):
-        clock = pygame.time.Clock()
-        running = True
-        
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    self.handle_click(event.pos)
-            
-            self.draw_board()
-            self.draw_status()
-            clock.tick(60)
-        
-        if self.engine:
+
+    def ejecutar(self):
+        reloj = pygame.time.Clock()
+        ejecutando = True
+
+        while ejecutando:
+            for evento in pygame.event.get():
+                if evento.type == pygame.QUIT:
+                    ejecutando = False
+                elif evento.type == pygame.MOUSEBUTTONDOWN:
+                    self.manejar_clic(evento.pos)
+
+            self.dibujar_tablero()
+            self.dibujar_estado()
+            reloj.tick(60)
+
+        if self.motor:
             try:
-                self.send_command({"cmd": "quit"})
-                self.engine.terminate()
+                self.enviar_comando({"cmd": "quit"})
+                self.motor.terminate()
             except:
                 pass
         pygame.quit()
 
 
 if __name__ == "__main__":
-    gui = ChessGUI()
-    gui.run()
+    gui = MotorAjedrezGUI()
+    gui.ejecutar()

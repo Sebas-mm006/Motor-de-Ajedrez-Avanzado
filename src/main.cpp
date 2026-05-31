@@ -65,7 +65,7 @@ void runBackendMode() {
                 for (int col = 0; col < BOARD_SIZE; ++col) {
                     if (!first) ss << ",";
                     first = false;
-                    Piece p = board.getPiece(row, col);
+                    const Piece& p = board.getPiece(row, col);
                     if (p.isNull()) {
                         ss << "null";
                     } else {
@@ -147,13 +147,73 @@ void runBackendMode() {
             }
             
             // Convert move to algebraic notation
+            // La fila 0 es la fila 8, la fila 7 es la fila 1
             char from_file = 'a' + best.from_col;
-            char from_rank = '1' + best.from_row;
+            char from_rank = '8' - best.from_row;
             char to_file = 'a' + best.to_col;
-            char to_rank = '1' + best.to_row;
+            char to_rank = '8' - best.to_row;
             string moveStr = string(1, from_file) + from_rank + to_file + to_rank;
             
             cout << "{\"status\": \"ok\", \"move\": \"" << moveStr << "\"}" << endl;
+            cout.flush();
+        }
+        else if (line.find("\"cmd\": \"legalmoves\"") != string::npos) {
+            // Extract row and col
+            size_t rowStart = line.find("\"row\": ");
+            size_t colStart = line.find("\"col\": ");
+            if (rowStart != string::npos && colStart != string::npos) {
+                rowStart += 7; // length of "\"row\": "
+                colStart += 7; // length of "\"col\": "
+                string rowStr = line.substr(rowStart);
+                string colStr = line.substr(colStart);
+                // Find end of numbers
+                size_t rowEnd = rowStr.find_first_of(",}");
+                size_t colEnd = colStr.find_first_of(",}");
+                if (rowEnd != string::npos && colEnd != string::npos) {
+                    rowStr = rowStr.substr(0, rowEnd);
+                    colStr = colStr.substr(0, colEnd);
+                    try {
+                        int row = stoi(rowStr);
+                        int col = stoi(colStr);
+                        
+                        PieceColor side = board.getTurn();
+                        vector<Move> allMoves = board.generateLegalMoves(side);
+                        vector<Move> pieceMoves;
+                        for (const Move& move : allMoves) {
+                            if (move.from_row == row && move.from_col == col) {
+                                pieceMoves.push_back(move);
+                            }
+                        }
+                        
+                        // Convert to JSON format expected by GUI
+                        stringstream ss;
+                        ss << "{\"status\": \"ok\", \"moves\": [";
+                        bool first = true;
+                        for (const Move& move : pieceMoves) {
+                            if (!first) ss << ",";
+                            first = false;
+                            ss << "{\"row\": " << move.to_row << ", \"col\": " << move.to_col;
+                            // Determine move type for highlighting
+                            const Piece& target = board.getPiece(move.to_row, move.to_col);
+                            if (move.type == MoveType::CASTLING) {
+                                ss << ", \"type\": \"castle\"";
+                            } else if (!target.isNull()) {
+                                ss << ", \"type\": \"capture\"";
+                            } else {
+                                ss << ", \"type\": \"normal\"";
+                            }
+                            ss << "}";
+                        }
+                        ss << "]}" << endl;
+                        cout << ss.str();
+                        cout.flush();
+                        continue;
+                    } catch (...) {
+                        // Invalid numbers, fall through to error
+                    }
+                }
+            }
+            cout << "{\"status\": \"error\", \"message\": \"Invalid parameters for legalmoves\"}" << endl;
             cout.flush();
         }
         else if (line.find("\"cmd\": \"quit\"") != string::npos) {

@@ -7,7 +7,7 @@
 #include <limits>
 
 /**
- * @brief Implementa el algoritmo de búsqueda Minimax con poda alfa-beta (usando Negamax)
+ * @brief Implementa un algoritmo de búsqueda recursivo
  * para encontrar el mejor movimiento en una posición dada.
  */
 class Search {
@@ -15,7 +15,7 @@ public:
     Search();                                        // Constructor por defecto
     
     /**
-     * @brief Busca el mejor movimiento usando Negamax con poda alfa-beta
+     * @brief Busca el mejor movimiento usando un algoritmo de búsqueda
      * @param board Posición actual del tablero
      * @param depth Profundidad máxima de búsqueda
      * @return Mejor movimiento para el jugador que tiene el turno
@@ -23,7 +23,7 @@ public:
     Move searchBestMove(const Board& board, int depth);
     
     /**
-     * @brief Búsqueda iterativa con profundidad progresiva
+     * @brief Busca el mejor movimiento con diferentes profundidades
      * @param board Posición actual del tablero
      * @param maxDepth Profundidad máxima de búsqueda
      * @return Mejor movimiento encontrado
@@ -32,18 +32,17 @@ public:
     
 private:
     /**
-     * @brief Algoritmo Negamax con poda alfa-beta
+     * @brief Algoritmo recursivo de búsqueda
      * @param board Posición actual del tablero
      * @param depth Profundidad restante de búsqueda
-     * @param alpha Límite inferior de la poda
-     * @param beta Límite superior de la poda
+     * @param alpha Límite inferior
+     * @param beta Límite superior
      * @return Evaluación de la posición desde la perspectiva del jugador que tiene el turno
      */
-    int negamax(Board board, int depth, int alpha, int beta);
+    int searchRecursive(Board board, int depth, int alpha, int beta);
     
     /**
-     * @brief Ordena los movimientos para mejorar la eficiencia de la poda alfa-beta
-     * (prioriza capturas primero)
+     * @brief Ordena los movimientos priorizando capturas
      * @param moves Vector de movimientos a ordenar
      * @param board Posición actual del tablero
      * @return Vector de movimientos ordenados

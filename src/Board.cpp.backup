@@ -19,9 +19,8 @@ Board::Board() : turn_(PieceColor::WHITE), en_passant_sq_(-1) {
     castling_rights_ = CastlingRights();
 }
 
-// Copy constructor - inicializa los miembros en el orden correcto
-Board::Board(const Board& other) : turn_(other.turn_), castling_rights_(other.castling_rights_), 
-    en_passant_sq_(other.en_passant_sq_) {
+// Copy constructor
+Board::Board(const Board& other) : turn_(other.turn_), en_passant_sq_(other.en_passant_sq_), castling_rights_(other.castling_rights_) {
     for (int i = 0; i < BOARD_SIZE; ++i) {
         for (int j = 0; j < BOARD_SIZE; ++j) {
             board_[i][j] = other.board_[i][j]->clone();
@@ -142,146 +141,127 @@ void Board::updateCastlingRights(const Move& move, const Piece& piece) {
 }
 
 void Board::make_move(const Move& move) {
-    // Obtener la pieza que se va a mover
     const Piece& movingPiece = getPiece(move.from_row, move.from_col);
     if (movingPiece.isNull()) {
-        return; // No hay pieza para mover
+        return;
     }
     
-    // Validar que el movimiento es legal (existe en la lista de movimientos legales)
-    PieceColor currentTurn = getTurn();
-    std::vector<Move> legalMoves = generateLegalMoves(currentTurn);
-    bool isLegal = false;
-    for (const Move& m : legalMoves) {
-        if (m.from_row == move.from_row && m.from_col == move.from_col && 
-            m.to_row == move.to_row && m.to_col == move.to_col) {
-            isLegal = true;
-            break;
-        }
-    }
-    
-    // Solo procesar el movimiento si es legal
-    if (isLegal) {
-        make_move_unchecked(move);
-    }
-}
-
-/**
- * @brief Mueve una pieza sin validar si es legal (usado internamente por Search)
- * Este método es necesario para evitar ciclos infinitos en la generación de movimientos legales
- */
-void Board::make_move_unchecked(const Move& move) {
-    // Obtener la pieza que se va a mover
-    const Piece& movingPiece = getPiece(move.from_row, move.from_col);
-    if (movingPiece.isNull()) {
-        return; // No hay pieza para mover
-    }
-    
-    // Guardar información para poder deshacer el movimiento
     UndoInfo undo;
     undo.moved_piece_type = movingPiece.getType();
     undo.moved_piece_color = movingPiece.getColor();
     undo.promoted_type = (move.type == MoveType::PROMOTION) ? move.promoted_piece_type : PieceType::NONE;
     undo.castling_rights = castling_rights_;
     undo.en_passant_sq = en_passant_sq_;
+    undo.captured_piece_type = PieceType::NONE;
+    undo.captured_piece_color = PieceColor::NONE;
     
-    // Manejar captura al paso (en passant)
     if (move.type == MoveType::EN_PASSANT) {
         int capture_row = move.from_row;
-        const Piece& ep_captured = getPiece(capture_row, move.to_col);
-        undo.captured_piece_type = ep_captured.getType();
-        undo.captured_piece_color = ep_captured.getColor();
-        // Eliminar la pieza capturada en passant
+        const Piece& captured_piece = getPiece(capture_row, move.to_col);
+        undo.captured_piece_type = captured_piece.getType();
+        undo.captured_piece_color = captured_piece.getColor();
         setPiece(capture_row, move.to_col, std::make_unique<NullPiece>());
+        setPiece(move.to_row, move.to_col, movingPiece.clone());
     } else {
-        // Captura normal - guardar la pieza capturada
         const Piece& captured_piece = getPiece(move.to_row, move.to_col);
         undo.captured_piece_type = captured_piece.getType();
         undo.captured_piece_color = captured_piece.getColor();
+        setPiece(move.to_row, move.to_col, movingPiece.clone());
     }
     
-    // Actualizar derechos de enroque
     updateCastlingRights(move, movingPiece);
     
-    // Colocar la pieza movida en el destino
-    setPiece(move.to_row, move.to_col, movingPiece.clone());
-    
-    // Eliminar la pieza de la posición original
-    setPiece(move.from_row, move.from_col, std::make_unique<NullPiece>());
-    
-    // Manejar enroque: mover la torre
     if (move.type == MoveType::CASTLING) {
         int row = move.from_row;
         if (move.to_col > move.from_col) {
-            // Enroque corto (kingside): torre de h1/h8 a f1/f8
+            // Kingside castling
             const Piece& rook = getPiece(row, 7);
             setPiece(row, 5, rook.clone());
             setPiece(row, 7, std::make_unique<NullPiece>());
         } else {
-            // Enroque largo (queenside): torre de a1/a8 a d1/d8
+            // Queenside castling
             const Piece& rook = getPiece(row, 0);
             setPiece(row, 3, rook.clone());
             setPiece(row, 0, std::make_unique<NullPiece>());
         }
     }
     
-    // Manejar promoción de peón
+    setPiece(move.from_row, move.from_col, std::make_unique<NullPiece>());
+    
     if (move.promoted_piece_type != PieceType::NONE) {
         setPiece(move.to_row, move.to_col, 
                 createPiece(move.promoted_piece_type, move.promoted_piece_color));
     }
     
-    // Actualizar square de en passant (si un peón avanza 2 casillas)
     en_passant_sq_ = -1;
     if (movingPiece.getType() == PieceType::PAWN && abs(move.to_row - move.from_row) == 2) {
         en_passant_sq_ = move.from_row * 8 + move.from_col + 8 * (move.to_row > move.from_row ? 1 : -1);
     }
     
-    // Cambiar el turno al otro jugador
+     turn_ = (turn_ == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
+     history_.push_back(undo);
+ }
+ 
+ void Board::undo_move(const Move& move) {
+    
+    setPiece(move.from_row, move.from_col, std::make_unique<NullPiece>());
+    
+    if (move.promoted_piece_type != PieceType::NONE) {
+        setPiece(move.to_row, move.to_col, 
+                createPiece(move.promoted_piece_type, move.promoted_piece_color));
+    }
+    
+    en_passant_sq_ = -1;
+    if (movingPiece.getType() == PieceType::PAWN && abs(move.to_row - move.from_row) == 2) {
+        en_passant_sq_ = move.from_row * 8 + move.from_col + 8 * (move.to_row > move.from_row ? 1 : -1);
+    }
+    
     turn_ = (turn_ == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
     history_.push_back(undo);
 }
 
 void Board::undo_move(const Move& move) {
-    // Verificar que hay movimientos para deshacer
     if (history_.empty()) return;
     
-    // Obtener la información del último movimiento
     UndoInfo undo = history_.back();
     history_.pop_back();
     
-    // Restaurar el turno al jugador anterior
     turn_ = (turn_ == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
     castling_rights_ = undo.castling_rights;
     en_passant_sq_ = undo.en_passant_sq;
     
-    // Manejar deshacer enroque: restaurar la torre
     if (move.type == MoveType::CASTLING) {
         int row = move.from_row;
         if (move.to_col > move.from_col) {
-            // Enroque corto (kingside): torre de f1/f8 a h1/h8
+            // Kingside castling
             const Piece& rook = getPiece(row, 5);
             setPiece(row, 7, rook.clone());
             setPiece(row, 5, std::make_unique<NullPiece>());
         } else {
-            // Enroque largo (queenside): torre de d1/d8 a a1/a8
+            // Queenside castling
             const Piece& rook = getPiece(row, 3);
             setPiece(row, 0, rook.clone());
             setPiece(row, 3, std::make_unique<NullPiece>());
         }
     }
     
-    // Restaurar la pieza movida a su posición original
+    // Restore the moved piece
     setPiece(move.from_row, move.from_col, 
             createPiece(undo.moved_piece_type, undo.moved_piece_color));
     
-    // Restaurar la pieza capturada o casilla vacía
+    // Restore captured piece or null
     if (undo.captured_piece_type != PieceType::NONE) {
-        // Había una pieza capturada, restaurarla
         setPiece(move.to_row, move.to_col, 
                 createPiece(undo.captured_piece_type, undo.captured_piece_color));
     } else {
-        // No había captura, dejar casilla vacía
+        setPiece(move.to_row, move.to_col, std::make_unique<NullPiece>());
+    }
+    
+    // Handle en passant capture restoration
+    if (move.type == MoveType::EN_PASSANT) {
+        int capture_row = (turn_ == PieceColor::WHITE) ? move.from_row + 1 : move.from_row - 1;
+        // The captured piece was already restored above if it existed
+        // Now we need to clear the destination square (where the pawn moved to)
         setPiece(move.to_row, move.to_col, std::make_unique<NullPiece>());
     }
 }
@@ -366,42 +346,11 @@ void Board::generatePieceMoves(int row, int col, std::vector<Move>& moves) const
     const Piece& piece = getPiece(row, col);
     if (!piece.isNull()) {
         piece.generateMoves(row, col, *this, moves);
-        
-        // Generar movimientos de enroque para el rey
-        if (piece.getType() == PieceType::KING && !piece.isNull()) {
-            PieceColor color = piece.getColor();
-            // Enroque corto (kingside)
-            if (color == PieceColor::WHITE && castling_rights_.white_kingside &&
-                getPiece(row, 5).isNull() && getPiece(row, 6).isNull() &&
-                !is_in_check(color) && !wouldMoveBeInCheck(Move(row, col, row, 5), color) &&
-                !wouldMoveBeInCheck(Move(row, col, row, 6), color)) {
-                moves.emplace_back(row, col, row, 6, PieceType::KING, color, MoveType::CASTLING);
-            }
-            if (color == PieceColor::BLACK && castling_rights_.black_kingside &&
-                getPiece(row, 5).isNull() && getPiece(row, 6).isNull() &&
-                !is_in_check(color) && !wouldMoveBeInCheck(Move(row, col, row, 5), color) &&
-                !wouldMoveBeInCheck(Move(row, col, row, 6), color)) {
-                moves.emplace_back(row, col, row, 6, PieceType::KING, color, MoveType::CASTLING);
-            }
-            // Enroque largo (queenside)
-            if (color == PieceColor::WHITE && castling_rights_.white_queenside &&
-                getPiece(row, 1).isNull() && getPiece(row, 2).isNull() && getPiece(row, 3).isNull() &&
-                !is_in_check(color) && !wouldMoveBeInCheck(Move(row, col, row, 3), color) &&
-                !wouldMoveBeInCheck(Move(row, col, row, 2), color)) {
-                moves.emplace_back(row, col, row, 2, PieceType::KING, color, MoveType::CASTLING);
-            }
-            if (color == PieceColor::BLACK && castling_rights_.black_queenside &&
-                getPiece(row, 1).isNull() && getPiece(row, 2).isNull() && getPiece(row, 3).isNull() &&
-                !is_in_check(color) && !wouldMoveBeInCheck(Move(row, col, row, 3), color) &&
-                !wouldMoveBeInCheck(Move(row, col, row, 2), color)) {
-                moves.emplace_back(row, col, row, 2, PieceType::KING, color, MoveType::CASTLING);
-            }
-        }
     }
 }
 
 bool Board::wouldMoveBeInCheck(const Move& move, PieceColor color) const {
     Board temp = *this;
-    temp.make_move_unchecked(move);  // Usar move sin validación para evitar ciclo infinito
+    temp.make_move(move);
     return temp.is_in_check(color);
 }

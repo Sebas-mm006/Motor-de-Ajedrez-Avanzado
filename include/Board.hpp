@@ -6,6 +6,7 @@
 #include <array>
 #include <vector>
 #include <iostream>
+#include <memory>
 
 constexpr int BOARD_SIZE = 8;
 
@@ -19,8 +20,10 @@ struct CastlingRights {
 };
 
 struct UndoInfo {
-    Piece captured_piece;
-    Piece moved_piece;
+    PieceType captured_piece_type;
+    PieceColor captured_piece_color;
+    PieceType moved_piece_type;
+    PieceColor moved_piece_color;
     PieceType promoted_type;
     CastlingRights castling_rights;
     int en_passant_sq;
@@ -32,10 +35,12 @@ struct UndoInfo {
 class Board {
 public:
     Board();                                                // Constructor por defecto
+    Board(const Board& other);                              // Constructor de copia
+    Board& operator=(const Board& other);                   // Operador de asignación
     void initStartPosition();                               // Inicializa la posición inicial de ajedrez
     
     /**
-     * @brief Ejecuta un movimiento en el tablero (asume que es legal)
+     * @brief Ejecuta un movimiento en el tablero (debe ser legal)
      * @param move Movimiento a realizar
      */
     void make_move(const Move& move);
@@ -47,9 +52,9 @@ public:
     void undo_move(const Move& move);
     
     // Obtiene la pieza en una posición específica
-    Piece getPiece(int row, int col) const;
+    const Piece& getPiece(int row, int col) const;
     // Establece una pieza en una posición específica (uso interno)
-    void setPiece(int row, int col, const Piece& piece);
+    void setPiece(int row, int col, std::unique_ptr<Piece> piece);
     
     // Obtiene cuyo turno es para mover
     PieceColor getTurn() const;
@@ -84,15 +89,25 @@ public:
     // Obtiene los derechos de enroque
     CastlingRights getCastlingRights() const { return castling_rights_; }
     
+    // Verifica si una posición está dentro del tablero
+    bool isSquareInside(int row, int col) const;                   // Verifica si una posición está dentro del tablero
+    
+friend class Search;  // Permite a Search acceder a make_move_unchecked
+
 private:
-    std::array<std::array<Piece, BOARD_SIZE>, BOARD_SIZE> board_;  // Matriz 8x8 de piezas
+    std::array<std::array<std::unique_ptr<Piece>, BOARD_SIZE>, BOARD_SIZE> board_;  // Matriz 8x8 de piezas
     PieceColor turn_;                                              // Indica cuyo turno es (BLANCO o NEGRO)
     CastlingRights castling_rights_;                               // Derechos de enroque
     int en_passant_sq_;                                            // Square de en passant (-1 si no hay)
     mutable std::vector<UndoInfo> history_;                        // Historial para undo
     
     // Métodos privados auxiliares
-    bool isSquareInside(int row, int col) const;                   // Verifica si una posición está dentro del tablero
+    
+    /**
+     * @brief Mueve una pieza sin validar si es legal (usado internamente por Search)
+     * @param move Movimiento a realizar
+     */
+    void make_move_unchecked(const Move& move);
     
     /**
      * @brief Genera movimientos pseudo-legales (ignorando jaque) para una pieza en (row, col)
@@ -121,6 +136,9 @@ private:
      * @brief Actualiza los derechos de enroque después de un movimiento
      */
     void updateCastlingRights(const Move& move, const Piece& piece);
+    
+    // Función auxiliar para crear piezas
+    std::unique_ptr<Piece> createPiece(PieceType type, PieceColor color);
 };
 
 #endif // BOARD_HPP
